@@ -24,6 +24,7 @@ function Sequencer:new()
   i.patterns = {}
   i:_init_values()
   i:_init_lattice()
+  i._pendulum_fwd = true
 
   return i
 end
@@ -62,7 +63,7 @@ function Sequencer:init_params()
     params:set_action(o..'_enabled', function(val) s:_update_pattern(o, {enabled=(val==1)}) end)
     params:add_number(o..'_start_point', 'Start Point', 1, MAX_LENGTH - 1, 1)
     params:add_number(o..'_end_point', 'End Point', 2, MAX_LENGTH, 8)
-    -- TODO: direction
+    params:add_option(o..'_direction', 'Direction', {'Forward', 'Backward', 'Pendulum', 'Random'})
     params:add_number(o..'_div_numerator', 'Clock Div: Numerator', 1, nil, 1)
     params:set_action(o..'_div_numerator', function(val) s:_update_pattern(o, {numerator=val}) end)
     params:add_number(o..'_div_denominator', 'Clock Div: Denominator', 1, nil, 1)
@@ -120,19 +121,51 @@ end
 function Sequencer:_lattice_action(output, step)
   local length = params:get(output..'_end_point') - params:get(output..'_start_point') + 1
   local index_past_start = self.value_indices[output] - params:get(output..'_start_point')
+
+  -- Figure out how we should handle Pendulum
+  local direction = params:get(output..'_direction')
+  if direction == 3 then -- Pendulum
+    if self._pendulum_fwd and (index_past_start + 1) > (length - 1) then
+      self._pendulum_fwd = false
+    elseif not self._pendulum_fwd and (index_past_start - 1) < 0 then
+      self._pendulum_fwd = true
+    end
+    if self._pendulum_fwd then
+      direction = 1 -- Forward
+    else
+      direction = 2 -- Backward
+    end
+  end
+
+  -- Get us into the positives (can happen if e.g. user has changed start point)
   while index_past_start < 0 do
     index_past_start = index_past_start + length
   end
-  local new_index_past_start = (index_past_start + 1) % length
+
+  -- Apply direction
+  local new_index_past_start = index_past_start
+  if direction == 1 then -- Forward
+    new_index_past_start = (index_past_start + 1) % length
+  elseif direction == 2 then -- Backward
+    new_index_past_start = (index_past_start + length - 1) % length
+  else -- Random
+    new_index_past_start = math.random(0, length - 1)
+  end
+
+  -- Look up index in values, translate to volts
   local value_index = new_index_past_start + params:get(output..'_start_point')
   local value = self.values[output][value_index]
   local volts = 0
   if value ~= nil then
     volts = util.linlin(MIN_VALUE, MAX_VALUE, params:get(output..'_min_volts'), params:get(output..'_max_volts'), value)
   end
+
+  -- Send volts and slew to crow
   local slew = self:_get_time_to_next_step(output, step)
   crow.output[output].slew = slew
   crow.output[output].volts = volts
+
+  -- Save our progression thru the patttern
   self.value_indices[output] = value_index
 end
 

@@ -56,6 +56,7 @@ local stop_label
 local play_label
 
 function init()
+  math.randomseed(os.time())
   init_params()
   init_sequencer()
   GridUI.init(sequencer)
