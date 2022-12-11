@@ -89,6 +89,8 @@ end
 -- clicking a value: jump playhead to cell
 -- hold a value, click another value: set start and end points
 -- row 2, rightmost cell: enter OneTrack mode
+-- row 2, second from rightmost cell: mute/unmute track
+-- row 2, thirrd from rightmost cell: play/pause track
 -- row 2, leftmost N cells: scroll to page N
 
 function Overview.refresh_grid_button(sequencer, x, y)
@@ -109,9 +111,21 @@ function Overview.refresh_grid_button(sequencer, x, y)
       Grid.connected_grid:led(x, y, CLEAR_LEVEL)
     end
   else
-    if x == Grid.grid_width then
+    if x == Grid.grid_width then -- Jump to OneTrack
       Grid.connected_grid:led(x, y, ACTIVE_ALT_LEVEL)
-    else
+    elseif x == Grid.grid_width - 1 then -- mute/unmute
+      if params:get(output..'_muted') == 1 then
+        Grid.connected_grid:led(x, y, ACTIVE_ALT_LEVEL)
+      else
+        Grid.connected_grid:led(x, y, INACTIVE_ALT_LEVEL)
+      end
+    elseif x == Grid.grid_width - 2 then -- play/pause
+      if params:get(output..'_playing') == 1 then
+        Grid.connected_grid:led(x, y, ACTIVE_ALT_LEVEL)
+      else
+        Grid.connected_grid:led(x, y, INACTIVE_ALT_LEVEL)
+      end
+    else -- Show page N
       local page_number = Grid.page_numbers[output]
       if x == page_number then
         Grid.connected_grid:led(x, y, ACTIVE_PAGE_LEVEL)
@@ -157,11 +171,23 @@ function Overview.key_callback(sequencer, x, y, state)
     end
   else
     if state == 1 then
-      if x == Grid.grid_width then
+      if x == Grid.grid_width then -- Jump to OneTrack
         Grid.held_keys_down = {nil, nil, nil, nil} -- length NUM_OUTPUTS
         OneTrack.track = output
         Grid.mode = OneTrack
-      else
+      elseif x == Grid.grid_width - 1 then -- mute/unmute
+        if params:get(output..'_muted') == 1 then
+          params:set(output..'_muted', 2)
+        else
+          params:set(output..'_muted', 1)
+        end
+      elseif x == Grid.grid_width - 2 then -- play/pause
+        if params:get(output..'_playing') == 1 then
+          params:set(output..'_playing', 2)
+        else
+          params:set(output..'_playing', 1)
+        end
+      else -- Show page N
         if x <= Grid._last_page_number() then
           Grid.page_numbers[output] = x
         end
@@ -175,19 +201,31 @@ end
 ------------------------
 -- top 7 rows are the values in sequence
 -- bottom row is meta:
--- page buttons, then jump buttons, then back button at the end
+-- page buttons, then jump buttons, then pause & mute & back button at the end
 -- page buttons let you jump to page N
 -- jump buttons let you jump to *track* N
 -- back button takes back to Overview
 
 function OneTrack._can_fit_track_jump()
-  return (Grid._last_page_number() + 1 + NUM_OUTPUTS + 1 + 1) <= Grid.grid_width
+  return (Grid._last_page_number() + 1 + NUM_OUTPUTS + 1 + 3) <= Grid.grid_width
 end
 
 function OneTrack.refresh_grid_button(sequencer, x, y)
   if y == HEIGHT then
-    if x == Grid.grid_width then
+    if x == Grid.grid_width then -- Back to Overview
       Grid.connected_grid:led(x, y, ACTIVE_ALT_LEVEL)
+    elseif x == Grid.grid_width - 1 then -- mute/unmute
+      if params:get(OneTrack.track..'_muted') == 1 then
+        Grid.connected_grid:led(x, y, ACTIVE_ALT_LEVEL)
+      else
+        Grid.connected_grid:led(x, y, INACTIVE_ALT_LEVEL)
+      end
+    elseif x == Grid.grid_width - 2 then -- play/pause
+      if params:get(OneTrack.track..'_playing') == 1 then
+        Grid.connected_grid:led(x, y, ACTIVE_ALT_LEVEL)
+      else
+        Grid.connected_grid:led(x, y, INACTIVE_ALT_LEVEL)
+      end
     elseif x <= Grid._last_page_number() then
       local page_number = Grid.page_numbers[OneTrack.track]
       if x == page_number then
@@ -239,6 +277,18 @@ function OneTrack.key_callback(sequencer, x, y, state)
       if x == Grid.grid_width then
         Grid.held_keys_down = {nil, nil, nil, nil} -- length NUM_OUTPUTS
         Grid.mode = Overview
+      elseif x == Grid.grid_width - 1 then -- mute/unmute
+        if params:get(OneTrack.track..'_muted') == 1 then
+          params:set(OneTrack.track..'_muted', 2)
+        else
+          params:set(OneTrack.track..'_muted', 1)
+        end
+      elseif x == Grid.grid_width - 2 then -- play/pause
+        if params:get(OneTrack.track..'_playing') == 1 then
+          params:set(OneTrack.track..'_playing', 2)
+        else
+          params:set(OneTrack.track..'_playing', 1)
+        end
       elseif x <= Grid._last_page_number() then
         Grid.page_numbers[OneTrack.track] = x
       elseif OneTrack._can_fit_track_jump() then

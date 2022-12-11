@@ -58,9 +58,17 @@ end
 function Sequencer:init_params()
   local s = self
   for o = 1,NUM_OUTPUTS do
-    params:add_group('Output '..o, 10)
-    params:add_option(o..'_enabled', 'Enabled', {'On', 'Off'})
-    params:set_action(o..'_enabled', function(val) s:_update_pattern(o, {enabled=(val==1)}) end)
+    params:add_group('Output '..o, 12)
+    params:add_option(o..'_playing', 'Playing?', {'Playing', 'Paused'})
+    params:set_action(o..'_playing', function(val)
+      s:_update_pattern(o, {playing=(val==1)})
+      UIState.grid_dirty = true
+    end)
+    params:add_option(o..'_muted', 'Muted?', {'Not Muted', 'Muted'})
+    params:set_action(o..'_muted', function(val)
+      s:_set_muted(o, val==2)
+      UIState.grid_dirty = true
+    end)
     params:add_number(o..'_start_point', 'Start Point', 1, MAX_LENGTH - 1, 1)
     params:add_number(o..'_end_point', 'End Point', 2, MAX_LENGTH, 8)
     params:add_option(o..'_direction', 'Direction', {'Forward', 'Backward', 'Pendulum', 'Random'})
@@ -68,7 +76,7 @@ function Sequencer:init_params()
     params:set_action(o..'_div_numerator', function(val) s:_update_pattern(o, {numerator=val}) end)
     params:add_number(o..'_div_denominator', 'Clock Div: Denominator', 1, nil, 1)
     params:set_action(o..'_div_denominator', function(val) s:_update_pattern(o, {denominator=val}) end)
-    params:add_number(o..'_swing', 'Swing', 0, 100, 50)
+    params:add_number(o..'_swing', 'Swing', 0, 100, 50, function(param) return param.value .. "%" end)
     params:set_action(o..'_swing', function(val) s:_update_pattern(o, {swing=val}) end)
     params:add_taper(o..'_delay', 'Delay', 0, 100, 0, 0, '%')
     params:set_action(o..'_delay', function(val) s:_update_pattern(o, {delay=val}) end)
@@ -90,8 +98,8 @@ function Sequencer:init_params()
 end
 
 function Sequencer:_update_pattern(output, values)
-  local enabled = values.enabled == nil and params:get(output..'_enabled')==1 or values.enabled
-  self.patterns[output].enabled = enabled
+  local playing = values.playing == nil and params:get(output..'_playing')==1 or values.playing
+  self.patterns[output].enabled = playing
   local numerator = values.numerator == nil and params:get(output..'_div_numerator') or values.numerator
   local denominator = values.denominator == nil and params:get(output..'_div_denominator') or values.denominator
   if denominator == nil then
@@ -152,18 +160,21 @@ function Sequencer:_lattice_action(output, step)
     new_index_past_start = math.random(0, length - 1)
   end
 
-  -- Look up index in values, translate to volts
+  -- Look up index in values, translate to volts, send volts and slew to crow
   local value_index = new_index_past_start + params:get(output..'_start_point')
-  local value = self.values[output][value_index]
-  local volts = 0
-  if value ~= nil then
-    volts = util.linlin(MIN_VALUE, MAX_VALUE, params:get(output..'_min_volts'), params:get(output..'_max_volts'), value)
+  if self:_get_muted(output) then
+    crow.output[output].slew = 0
+    crow.output[output].volts = 0
+  else
+    local volts = 0
+    local value = self.values[output][value_index]
+    if value ~= nil then
+      volts = util.linlin(MIN_VALUE, MAX_VALUE, params:get(output..'_min_volts'), params:get(output..'_max_volts'), value)
+    end
+    local slew = self:_get_time_to_next_step(output, step)
+    crow.output[output].slew = slew
+    crow.output[output].volts = volts
   end
-
-  -- Send volts and slew to crow
-  local slew = self:_get_time_to_next_step(output, step)
-  crow.output[output].slew = slew
-  crow.output[output].volts = volts
 
   -- Save our progression thru the patttern
   self.value_indices[output] = value_index
@@ -200,6 +211,29 @@ end
 
 function Sequencer:get_playhead(output)
   return self.value_indices[output]
+end
+
+function Sequencer:_set_muted(output, muted)
+  -- TODO: DRY up with _lattice_action
+  if muted then
+    crow.output[output].slew = 0
+    crow.output[output].volts = 0
+  else
+    local value_index = self.value_indices[output]
+    local value = self.values[output][value_index]
+    local volts = 0
+    if value ~= nil then
+      volts = util.linlin(MIN_VALUE, MAX_VALUE, params:get(output..'_min_volts'), params:get(output..'_max_volts'), value)
+    end
+    -- TODO: we're likely in between steps, so this will need to take that into account
+    local slew = self:_get_time_to_next_step(output, value_index)
+    crow.output[output].slew = slew
+    crow.output[output].volts = volts
+  end
+end
+
+function Sequencer:_get_muted(output)
+  return params:get(output..'_muted') == 2
 end
 
 function Sequencer:cleanup()
