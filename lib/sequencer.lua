@@ -32,7 +32,11 @@ function Sequencer:_init_values()
   for o = 1,NUM_OUTPUTS do
     self.values[o] = {}
     for i = 1,DEFAULT_LENGTH do
-      self.values[o][i] = util.round(util.linlin(1, DEFAULT_LENGTH, MIN_VALUE, MAX_VALUE, i))
+      if i % 2 == 0 then
+        self.values[o][i] = util.round(util.linlin(1, DEFAULT_LENGTH, MIN_VALUE, MAX_VALUE, i))
+      else
+        self.values[o][i] = 0
+      end
     end
     self.value_indices[o] = 0
   end
@@ -155,11 +159,14 @@ function Sequencer:get_value(output, x)
 end
 
 function Sequencer:set_playhead(output, x)
-  -- TODO
+  -- subtract 1 so that the next _lattice_action steps forward and sets it to x
+  self.value_indices[output] = x - 1
+  -- TODO: manipulate self.patterns[output] such that _lattice_action triggers basically immediately?
+  --  in other words, is set_playhead a quantized fn?
 end
 
-function Sequencer:get_playhead(output, x)
-  -- TODO
+function Sequencer:get_playhead(output)
+  return self.value_indices[output]
 end
 
 function Sequencer:cleanup()
