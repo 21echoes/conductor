@@ -22,14 +22,20 @@
 --  to set start & end points.
 -- 2nd row in pair:
 --  left buttons paginate
---  right button zooms in
+--  right buttons:
+--    play/pause
+--    mute/unmute
+--    zoom in
 --
 -- Grid "zoomed in":
 -- Top 7 rows set voltage level
 -- Last row:
 --  Left buttons paginate
 --  Mid buttons switch tracks
---  Right button zooms out
+--  Right buttons:
+--    play/pause
+--    mute/unmute
+--    zoom out
 --
 --
 -- Additional per-output params
@@ -41,8 +47,8 @@
 --  * min & max voltage
 --
 --
--- v0.0.1 @21echoes
-local current_version = "0.0.1"
+-- v0.0.2 @21echoes
+local current_version = "0.0.2"
 
 local Sequencer = include('lib/sequencer')
 local UIState = include('lib/ui/util/devices')
