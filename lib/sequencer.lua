@@ -21,7 +21,7 @@ function Sequencer:new()
 
   i.values = {}
   i.value_indices = {}
-  i.patterns = {}
+  i.sprockets = {}
   i:_init_values()
   i:_init_lattice()
   i._pendulum_fwd = true
@@ -49,7 +49,7 @@ function Sequencer:_init_lattice()
   })
   local s = self
   for o = 1,NUM_OUTPUTS do
-    self.patterns[o] = self.lattice:new_pattern({
+    self.sprockets[o] = self.lattice:new_sprocket({
       action = function(t) s:_lattice_action(o, t) end
     })
   end
@@ -61,7 +61,7 @@ function Sequencer:init_params()
     params:add_group('Output '..o, 12)
     params:add_option(o..'_playing', 'Playing?', {'Playing', 'Paused'})
     params:set_action(o..'_playing', function(val)
-      s:_update_pattern(o, {playing=(val==1)})
+      s:_update_sprocket(o, {playing=(val==1)})
       UIState.grid_dirty = true
     end)
     params:add_option(o..'_muted', 'Muted?', {'Not Muted', 'Muted'})
@@ -73,13 +73,13 @@ function Sequencer:init_params()
     params:add_number(o..'_end_point', 'End Point', 2, MAX_LENGTH, 8)
     params:add_option(o..'_direction', 'Direction', {'Forward', 'Backward', 'Pendulum', 'Random'})
     params:add_number(o..'_div_numerator', 'Clock Div: Numerator', 1, nil, 1)
-    params:set_action(o..'_div_numerator', function(val) s:_update_pattern(o, {numerator=val}) end)
+    params:set_action(o..'_div_numerator', function(val) s:_update_sprocket(o, {numerator=val}) end)
     params:add_number(o..'_div_denominator', 'Clock Div: Denominator', 1, nil, 1)
-    params:set_action(o..'_div_denominator', function(val) s:_update_pattern(o, {denominator=val}) end)
+    params:set_action(o..'_div_denominator', function(val) s:_update_sprocket(o, {denominator=val}) end)
     params:add_number(o..'_swing', 'Swing', 0, 100, 50, function(param) return param.value .. "%" end)
-    params:set_action(o..'_swing', function(val) s:_update_pattern(o, {swing=val}) end)
+    params:set_action(o..'_swing', function(val) s:_update_sprocket(o, {swing=val}) end)
     params:add_taper(o..'_delay', 'Delay', 0, 100, 0, 0, '%')
-    params:set_action(o..'_delay', function(val) s:_update_pattern(o, {delay=val}) end)
+    params:set_action(o..'_delay', function(val) s:_update_sprocket(o, {delay=val}) end)
     params:add_option(o..'_slew_shape', 'Slew Shape', {'Sine', 'Triangle', 'Square'})
     params:set_action(o..'_slew_shape', function(val) s:_update_slew_shape(o, val) end)
     params:add_control(o..'_min_volts', "Min Volts", ControlSpec.new(MIN_VOLTS, MAX_VOLTS, "lin", MIN_SEPARATION, MIN_VOLTS, 'V'))
@@ -97,19 +97,19 @@ function Sequencer:init_params()
   end
 end
 
-function Sequencer:_update_pattern(output, values)
+function Sequencer:_update_sprocket(output, values)
   local playing = values.playing == nil and params:get(output..'_playing')==1 or values.playing
-  self.patterns[output].enabled = playing
+  self.sprockets[output].enabled = playing
   local numerator = values.numerator == nil and params:get(output..'_div_numerator') or values.numerator
   local denominator = values.denominator == nil and params:get(output..'_div_denominator') or values.denominator
   if denominator == nil then
     denominator = 1
   end
-  self.patterns[output]:set_division(numerator/denominator/METER)
+  self.sprockets[output]:set_division(numerator/denominator/METER)
   local swing = values.swing == nil and params:get(output..'_swing') or values.swing
-  self.patterns[output]:set_swing(swing)
+  self.sprockets[output]:set_swing(swing)
   local delay = values.delay == nil and params:get(output..'_delay') or values.delay
-  self.patterns[output]:set_delay(delay/100)
+  self.sprockets[output]:set_delay(delay/100)
 end
 
 local slew_option_to_crow = {
@@ -123,7 +123,7 @@ end
 
 function Sequencer:_get_time_to_next_step(output, cur)
   -- TODO: swing, delay, more?
-  return clock:get_beat_sec() * (METER * self.patterns[output].division)
+  return clock:get_beat_sec() * (METER * self.sprockets[output].division)
 end
 
 function Sequencer:_lattice_action(output, step)
@@ -176,7 +176,7 @@ function Sequencer:_lattice_action(output, step)
     crow.output[output].volts = volts
   end
 
-  -- Save our progression thru the patttern
+  -- Save our progression thru the pattern
   self.value_indices[output] = value_index
 end
 
@@ -205,7 +205,7 @@ end
 function Sequencer:set_playhead(output, x)
   -- subtract 1 so that the next _lattice_action steps forward and sets it to x
   self.value_indices[output] = x - 1
-  -- TODO: manipulate self.patterns[output] such that _lattice_action triggers basically immediately?
+  -- TODO: manipulate self.sprockets[output] such that _lattice_action triggers basically immediately?
   --  in other words, is set_playhead a quantized fn?
 end
 

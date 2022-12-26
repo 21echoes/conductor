@@ -47,8 +47,8 @@
 --  * min & max voltage
 --
 --
--- v0.0.2 @21echoes
-local current_version = "0.0.2"
+-- v0.0.3 @21echoes
+local current_version = "0.0.3"
 
 local Sequencer = include('lib/sequencer')
 local UIState = include('lib/ui/util/devices')
