@@ -1,6 +1,6 @@
 local Lattice = require('lattice')
 local ControlSpec = require('controlspec')
-local UIState = include('lib/ui/util/devices')
+local UIState = require('conductor/lib/ui/util/devices')
 
 local Sequencer = {}
 
