@@ -2,6 +2,11 @@
 -- written to track dirty states of UI, provide a generic refresh function
 -- written to not be directly dependent on norns global variables
 
+-- Make sure there's only one copy
+if _ConductorUI ~= nil then
+  return _ConductorUI
+end
+
 local UI = {}
 
 -- refresh logic

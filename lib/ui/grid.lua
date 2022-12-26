@@ -38,19 +38,19 @@ function Grid.init(sequencer)
   local device = grid.connect()
   UIState.init_grid({
     device = device,
-    key_callback = function(x, y, state) key_callback(sequencer, x, y, state) end,
-    refresh_callback = function(my_grid) refresh_callback(sequencer, my_grid) end,
-    width_changed_callback = function(new_width) width_changed_callback(sequencer, new_width) end,
+    key_callback = function(x, y, state) Grid._key_callback(sequencer, x, y, state) end,
+    refresh_callback = function(my_grid) Grid._refresh_callback(sequencer, my_grid) end,
+    width_changed_callback = function(new_width) Grid._width_changed_callback(sequencer, new_width) end,
   })
 end
 
-function key_callback(sequencer, x, y, state)
+function Grid._key_callback(sequencer, x, y, state)
   Grid.mode.key_callback(sequencer, x, y, state)
   UIState.grid_dirty = true
   UIState.flash_event()
 end
 
-function refresh_callback(sequencer, my_grid)
+function Grid._refresh_callback(sequencer, my_grid)
   Grid.connected_grid = my_grid
   for x=1,Grid.grid_width do
     for y=1,HEIGHT do
@@ -59,7 +59,7 @@ function refresh_callback(sequencer, my_grid)
   end
 end
 
-function width_changed_callback(sequencer, new_width)
+function Grid._width_changed_callback(sequencer, new_width)
   Grid.grid_width = new_width
   Grid.page_numbers = {1,1,1,1} -- length NUM_OUTPUTS
   UIState.grid_dirty = true
